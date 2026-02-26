@@ -4,17 +4,17 @@ import numpy as np
 import pandas as pd
 
 # ---------------------------
-# Load Files
+# Load Dataset + Model
 # ---------------------------
+df = pd.read_csv("weatherHistory.csv")
 model = joblib.load("best_model.pkl")
 le = joblib.load("label_encoder.pkl")
-df = pd.read_csv("weatherHistory.csv")
 
 st.set_page_config(page_title="Weather Prediction", layout="centered")
 st.title("🌦 Weather Summary Prediction")
 
 # ---------------------------
-# Feature List
+# Feature List (MUST match training order)
 # ---------------------------
 features = [
     "Temperature (C)",
@@ -36,13 +36,13 @@ visibility = st.number_input("Visibility (km)", value=10.0)
 pressure = st.number_input("Pressure (millibars)", value=1000.0)
 
 # ---------------------------
-# Prediction Button
+# Predict Button
 # ---------------------------
 if st.button("Predict"):
 
     try:
-        # Create input DataFrame
-        input_data = pd.DataFrame([[
+        # Create DataFrame with correct column names
+        input_df = pd.DataFrame([[
             temp,
             humidity,
             wind_speed,
@@ -51,32 +51,26 @@ if st.button("Predict"):
             pressure
         ]], columns=features)
 
-        # ---------------------------
-        # 1️⃣ CHECK EXACT MATCH IN DATASET
-        # ---------------------------
-        matched_row = df[
-            (df["Temperature (C)"] == temp) &
-            (df["Humidity"] == humidity) &
-            (df["Wind Speed (km/h)"] == wind_speed) &
-            (df["Wind Bearing (degrees)"] == wind_bearing) &
-            (df["Visibility (km)"] == visibility) &
-            (df["Pressure (millibars)"] == pressure)
-        ]
+        # Model prediction
+        pred_encoded = model.predict(input_df)
 
-        if not matched_row.empty:
-            exact_summary = matched_row.iloc[0]["Summary"]
-            st.success(f"📊 Exact Dataset Match Found!")
-            st.success(f"🌤 Weather Summary: **{exact_summary}**")
+        # Convert numeric label back to actual Summary text
+        predicted_summary = le.inverse_transform(pred_encoded)[0]
 
-        else:
-            # ---------------------------
-            # 2️⃣ OTHERWISE USE ML MODEL
-            # ---------------------------
-            pred = model.predict(input_data)
-            predicted_label = le.inverse_transform(pred)[0]
+        st.success(f"🌤 Predicted Weather Summary: **{predicted_summary}**")
 
-            st.warning("⚠ No exact dataset match. Showing ML prediction.")
-            st.success(f"🤖 Predicted Weather Summary: **{predicted_label}**")
+        # Optional: Show probability
+        if hasattr(model, "predict_proba"):
+            probabilities = model.predict_proba(input_df)[0]
+            class_labels = le.inverse_transform(np.arange(len(probabilities)))
+
+            prob_df = pd.DataFrame({
+                "Weather Summary": class_labels,
+                "Probability": probabilities
+            }).sort_values(by="Probability", ascending=False)
+
+            st.subheader("Prediction Confidence")
+            st.dataframe(prob_df.head(5))
 
     except Exception as e:
         st.error(f"Prediction Error: {e}")
