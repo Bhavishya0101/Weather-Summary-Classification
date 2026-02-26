@@ -14,13 +14,12 @@ st.title("🌦 Weather Summary Prediction")
 # ---------------------------
 # User Inputs
 # ---------------------------
-temp = st.number_input("Temperature (C)", value=20.0)
-humidity = st.slider("Humidity", 0.0, 1.0, value=0.5)
-wind_speed = st.number_input("Wind Speed (km/h)", value=5.0)
-wind_bearing = st.number_input("Wind Bearing (degrees)", value=100.0)
-visibility = st.number_input("Visibility (km)", value=10.0)
-pressure = st.number_input("Pressure (millibars)", value=1000.0)
-
+temp = st.number_input("Temperature (C)")
+humidity = st.slider("Humidity", 0.0, 1.0)
+wind_speed = st.number_input("Wind Speed (km/h)")
+wind_bearing = st.number_input("Wind Bearing (degrees)")
+visibility = st.number_input("Visibility (km)")
+pressure = st.number_input("Pressure (millibars)")
 # ---------------------------
 # Prediction
 # ---------------------------
@@ -41,3 +40,4 @@ if st.button("Predict"):
     result = le.inverse_transform(pred)[0]
 
     st.success(f"Predicted Weather: {result}")
+
