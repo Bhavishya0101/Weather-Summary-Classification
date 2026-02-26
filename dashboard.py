@@ -4,14 +4,19 @@ import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score
+)
 
 # -------------------------------
 # Page Configuration
 # -------------------------------
 st.set_page_config(page_title="Weather Dashboard", layout="wide")
-
 st.title("🌦 Weather Summary Classification Dashboard")
 
 # -------------------------------
@@ -28,11 +33,13 @@ df = load_data()
 # -------------------------------
 menu = st.sidebar.radio(
     "Navigation",
-    ["Dataset Overview",
-     "Class Distribution",
-     "Correlation Heatmap",
-     "Model Performance",
-     "Feature Importance"]
+    [
+        "Dataset Overview",
+        "Class Distribution",
+        "Correlation Heatmap",
+        "Model Performance",
+        "Feature Importance"
+    ]
 )
 
 # -------------------------------
@@ -49,10 +56,8 @@ if menu == "Dataset Overview":
 elif menu == "Class Distribution":
     st.subheader("Weather Summary Distribution")
 
-    if "Summary" in df.columns:
-        class_counts = df["Summary"].value_counts()
-    else:
-        class_counts = df["Weather_Summary"].value_counts()
+    target_col = "Summary" if "Summary" in df.columns else "Weather_Summary"
+    class_counts = df[target_col].value_counts()
 
     fig, ax = plt.subplots(figsize=(12,6))
     class_counts.plot(kind="bar", ax=ax)
@@ -78,12 +83,10 @@ elif menu == "Model Performance":
     st.subheader("Model Evaluation")
 
     try:
-        # Correct model path
+        # Load trained pipeline model
         model = joblib.load("best_model.pkl")
-        scaler = joblib.load("scaler.pkl")
         le = joblib.load("label_encoder.pkl")
 
-        # Prepare dataset for evaluation
         df_model = df[[
             "Temperature (C)",
             "Humidity",
@@ -94,31 +97,21 @@ elif menu == "Model Performance":
             "Summary"
         ]].dropna()
 
-        # Keep top 10 classes
+        # Keep top 10 classes for stability
         top_classes = df_model["Summary"].value_counts().nlargest(10).index
         df_model = df_model[df_model["Summary"].isin(top_classes)]
 
         X = df_model.drop("Summary", axis=1)
         y = le.transform(df_model["Summary"])
 
-        # Scale
-        X_scaled = scaler.transform(X)
-
-        # Predict
-        y_pred = model.predict(X_scaled)
+        # 🔥 No manual scaling needed (pipeline handles it)
+        y_pred = model.predict(X)
 
         # Metrics
-        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
-        accuracy = accuracy_score(y, y_pred)
-        precision = precision_score(y, y_pred, average='weighted')
-        recall = recall_score(y, y_pred, average='weighted')
-        f1 = f1_score(y, y_pred, average='weighted')
-
-        st.metric("Accuracy", f"{accuracy:.4f}")
-        st.metric("Precision (Weighted)", f"{precision:.4f}")
-        st.metric("Recall (Weighted)", f"{recall:.4f}")
-        st.metric("F1-Score (Weighted)", f"{f1:.4f}")
+        st.metric("Accuracy", f"{accuracy_score(y, y_pred):.4f}")
+        st.metric("Precision (Weighted)", f"{precision_score(y, y_pred, average='weighted'):.4f}")
+        st.metric("Recall (Weighted)", f"{recall_score(y, y_pred, average='weighted'):.4f}")
+        st.metric("F1-Score (Weighted)", f"{f1_score(y, y_pred, average='weighted'):.4f}")
 
         # Classification Report
         st.text("Classification Report:")
@@ -144,8 +137,14 @@ elif menu == "Feature Importance":
     try:
         model = joblib.load("best_model.pkl")
 
-        if hasattr(model, "feature_importances_"):
-            importance = model.feature_importances_
+        # If model is pipeline, extract actual estimator
+        if hasattr(model, "named_steps"):
+            estimator = model.named_steps["model"]
+        else:
+            estimator = model
+
+        if hasattr(estimator, "feature_importances_"):
+            importance = estimator.feature_importances_
 
             features = [
                 "Temperature (C)",
@@ -164,8 +163,9 @@ elif menu == "Feature Importance":
             fig, ax = plt.subplots()
             sns.barplot(data=feat_df, x="Importance", y="Feature", ax=ax)
             st.pyplot(fig)
+
         else:
             st.info("This model does not support feature importance.")
 
-    except:
-        st.warning("Model file not found.")
+    except Exception as e:
+        st.warning(f"Model file error: {e}")
