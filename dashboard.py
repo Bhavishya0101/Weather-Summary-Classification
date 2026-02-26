@@ -13,24 +13,15 @@ from sklearn.metrics import (
     f1_score
 )
 
-# -------------------------------
-# Page Config
-# -------------------------------
 st.set_page_config(page_title="Weather Dashboard", layout="wide")
 st.title("🌦 Weather Summary Classification Dashboard")
 
-# -------------------------------
-# Load Dataset
-# -------------------------------
 @st.cache_data
 def load_data():
     return pd.read_csv("weatherHistory.csv")
 
 df = load_data()
 
-# -------------------------------
-# Sidebar
-# -------------------------------
 menu = st.sidebar.radio(
     "Navigation",
     [
@@ -42,17 +33,11 @@ menu = st.sidebar.radio(
     ]
 )
 
-# -------------------------------
-# Dataset Overview
-# -------------------------------
 if menu == "Dataset Overview":
     st.subheader("Dataset Overview")
     st.write("Shape:", df.shape)
     st.dataframe(df.head())
 
-# -------------------------------
-# Class Distribution
-# -------------------------------
 elif menu == "Class Distribution":
     st.subheader("Weather Summary Distribution")
 
@@ -64,9 +49,6 @@ elif menu == "Class Distribution":
     plt.xticks(rotation=45)
     st.pyplot(fig)
 
-# -------------------------------
-# Correlation Heatmap
-# -------------------------------
 elif menu == "Correlation Heatmap":
     st.subheader("Feature Correlation")
 
@@ -76,48 +58,38 @@ elif menu == "Correlation Heatmap":
     sns.heatmap(numeric_df.corr(), annot=True, cmap="coolwarm", ax=ax)
     st.pyplot(fig)
 
-# -------------------------------
-# Model Performance
-# -------------------------------
 elif menu == "Model Performance":
     st.subheader("Model Evaluation")
 
     try:
-        # 🔥 Load ONLY pipeline model
         model = joblib.load("best_model.pkl")
         le = joblib.load("label_encoder.pkl")
 
-        df_model = df[[
+        features = [
             "Temperature (C)",
             "Humidity",
             "Wind Speed (km/h)",
             "Wind Bearing (degrees)",
             "Visibility (km)",
-            "Pressure (millibars)",
-            "Summary"
-        ]].dropna()
+            "Pressure (millibars)"
+        ]
 
-        # Keep top 10 classes
-        top_classes = df_model["Summary"].value_counts().nlargest(10).index
-        df_model = df_model[df_model["Summary"].isin(top_classes)]
+        df_model = df[features + ["Summary"]].dropna()
 
-        X = df_model.drop("Summary", axis=1)
+        X = df_model[features]
         y = le.transform(df_model["Summary"])
 
-        # 🔥 No manual scaling
+        # 🔥 Works for both Pipeline and normal model
         y_pred = model.predict(X)
 
-        # Metrics
         st.metric("Accuracy", f"{accuracy_score(y, y_pred):.4f}")
         st.metric("Precision (Weighted)", f"{precision_score(y, y_pred, average='weighted'):.4f}")
         st.metric("Recall (Weighted)", f"{recall_score(y, y_pred, average='weighted'):.4f}")
         st.metric("F1-Score (Weighted)", f"{f1_score(y, y_pred, average='weighted'):.4f}")
 
-        # Classification Report
         st.text("Classification Report:")
         st.text(classification_report(y, y_pred))
 
-        # Confusion Matrix
         cm = confusion_matrix(y, y_pred)
 
         fig, ax = plt.subplots(figsize=(8,6))
@@ -128,16 +100,13 @@ elif menu == "Model Performance":
     except Exception as e:
         st.error(f"Model loading error: {e}")
 
-# -------------------------------
-# Feature Importance
-# -------------------------------
 elif menu == "Feature Importance":
     st.subheader("Feature Importance")
 
     try:
         model = joblib.load("best_model.pkl")
 
-        # If Pipeline, extract actual estimator
+        # If pipeline, extract estimator
         if hasattr(model, "named_steps"):
             estimator = model.named_steps["model"]
         else:
